@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateUI() {
         trxBalance.textContent = (userData.balance || 0).toFixed(5);
         walletInput.value = userData.walletAddress || '';
-        referralLinkInput.value = `https://t.me/YOUR_BOT_USERNAME?start=${userId}`;
+        referralLinkInput.value = `https://t.me/TrxEarnBot_bot?start=${userId}`;
         verifiedReferrals.textContent = (userData.referrals || []).length;
         // referralEarnings would need to be calculated and stored separately
     }
@@ -113,30 +113,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Event Listeners ---
     setWalletBtn.addEventListener('click', async () => {
         const newAddress = walletInput.value.trim();
-        if (newAddress) {
+        // Basic validation for a TRX address (starts with 'T', 34 chars)
+        if (newAddress.startsWith('T') && newAddress.length === 34) {
             await updateDoc(doc(db, 'users', userId), { walletAddress: newAddress });
             userData.walletAddress = newAddress;
+            updateUI(); // Refresh the UI to show the new address
             alert('Wallet address updated!');
+        } else {
+            alert('Invalid TRX wallet address. It must start with T and be 34 characters long.');
         }
     });
 
     withdrawBtn.addEventListener('click', async () => {
-        const amount = 3.5; // Fixed minimum withdrawal
-        if (userData.balance >= amount && userData.walletAddress) {
-            await addDoc(collection(db, 'withdrawals'), {
-                userId: userId,
-                amount: amount,
-                walletAddress: userData.walletAddress,
-                status: 'pending',
-                timestamp: serverTimestamp()
-            });
-            userData.balance -= amount;
-            await updateDoc(doc(db, 'users', userId), { balance: userData.balance });
-            updateUI();
-            alert('Withdrawal request submitted!');
-        } else {
-            alert('Insufficient balance or no wallet address set.');
+        const withdrawalAmountInput = document.getElementById('withdrawal-amount');
+        const amount = parseFloat(withdrawalAmountInput.value);
+
+        if (isNaN(amount) || amount <= 0) {
+            alert('Please enter a valid amount to withdraw.');
+            return;
         }
+        if (amount < 3.5) {
+            alert('Minimum withdrawal amount is 3.5 TRX.');
+            return;
+        }
+        if (amount > userData.balance) {
+            alert('Insufficient balance.');
+            return;
+        }
+        if (!userData.walletAddress) {
+            alert('Please set your wallet address first.');
+            return;
+        }
+
+        // All checks passed, proceed with withdrawal request
+        await addDoc(collection(db, 'withdrawals'), {
+            userId: userId,
+            amount: amount,
+            walletAddress: userData.walletAddress,
+            status: 'pending',
+            timestamp: serverTimestamp()
+        });
+
+        userData.balance -= amount;
+        await updateDoc(doc(db, 'users', userId), { balance: userData.balance });
+        
+        updateUI();
+        withdrawalAmountInput.value = ''; // Clear the input field
+        alert('Withdrawal request submitted!');
     });
 
     watchAdBtn.addEventListener('click', () => {
