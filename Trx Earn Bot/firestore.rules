@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can only read and write to their own user document.
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+    }
+
+    // Tasks are publicly readable, but not writable by clients.
+    match /tasks/{taskId} {
+      allow read: if true;
+      allow create, update, delete: if false; // Should be managed by an admin SDK
+    }
+
+    // Users can create withdrawal requests for themselves.
+    // Status can only be updated by admin logic, not directly.
+    match /withdrawals/{withdrawalId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update: if false; // Managed by admin SDK
+    }
+  }
+}
