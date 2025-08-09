@@ -6,22 +6,86 @@
     <title>TRX Earn Bot</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src='//libtl.com/sdk.js' data-zone='9682261' data-sdk='show_9682261'></script>
 </head>
 <body>
-    <div id="app">
-        <div id="main-content">
-            <!-- Sections will be loaded here -->
+    <div class="app">
+        <!-- Wallet Section -->
+        <div id="wallet-section" class="page active">
+            <div class="header">
+                <h1>Wallet</h1>
+            </div>
+            <div class="content">
+                <div class="balance-card">
+                    <h2>Your Balance</h2>
+                    <p><span id="trx-balance">0.000</span> TRX</p>
+                </div>
+                <div class="wallet-address">
+                    <h2>Your TRX Wallet</h2>
+                    <input type="text" id="wallet-input" placeholder="Your TRX Wallet Address">
+                    <button id="set-wallet-btn">Set Address</button>
+                </div>
+                <div class="withdrawal">
+                    <h2>Withdrawal</h2>
+                    <p>Minimum withdrawal: 3.5 TRX</p>
+                    <button id="withdraw-btn">Request Withdrawal</button>
+                </div>
+            </div>
         </div>
 
-        <nav id="bottom-nav">
-            <button class="nav-btn" data-section="wallet">Wallet</button>
-            <button class="nav-btn" data-section="earn">Earn</button>
-            <button class="nav-btn" data-section="tasks">Tasks</button>
-            <button class="nav-btn" data-section="referral">Referral</button>
-        </nav>
+        <!-- Earn Section -->
+        <div id="earn-section" class="page">
+            <div class="header">
+                <h1>Earn TRX</h1>
+            </div>
+            <div class="content">
+                <div class="earn-card">
+                    <h2>Watch Ads</h2>
+                    <p>Earn 0.005 TRX for each ad you watch.</p>
+                    <button id="watch-ad-btn">Watch Ad</button>
+                    <p id="ad-cooldown-timer" class="cooldown"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks Section -->
+        <div id="tasks-section" class="page">
+            <div class="header">
+                <h1>Complete Tasks</h1>
+            </div>
+            <div id="task-list" class="content">
+                <!-- Tasks will be dynamically loaded here -->
+                <p>No tasks available at the moment.</p>
+            </div>
+        </div>
+
+        <!-- Referral Section -->
+        <div id="referral-section" class="page">
+            <div class="header">
+                <h1>Referral Program</h1>
+            </div>
+            <div class="content">
+                <div class="referral-info">
+                    <h2>Your Referral Link</h2>
+                    <input type="text" id="referral-link" readonly>
+                    <button id="copy-link-btn">Copy Link</button>
+                </div>
+                <div class="referral-stats">
+                    <p>Verified Referrals: <span id="verified-referrals">0</span></p>
+                    <p>Total Earnings: <span id="referral-earnings">0</span> TRX</p>
+                </div>
+                <p class="info">Refer a user and earn 0.05 TRX after they watch 5 ads. You'll also get 10% of their future withdrawals.</p>
+            </div>
+        </div>
     </div>
 
-    <script src='//libtl.com/sdk.js' data-zone='9682261' data-sdk='show_9682261'></script>
-    <script type="module" src="script.js"></script>
+    <nav class="bottom-nav">
+        <button class="nav-btn active" data-page="wallet-section">Wallet</button>
+        <button class="nav-btn" data-page="earn-section">Earn</button>
+        <button class="nav-btn" data-page="tasks-section">Tasks</button>
+        <button class="nav-btn" data-page="referral-section">Referral</button>
+    </nav>
+
+    <script src="script.js"></script>
 </body>
 </html>
