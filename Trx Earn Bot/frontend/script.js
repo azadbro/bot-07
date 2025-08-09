@@ -12,73 +12,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         projectId: "trx-earn-bott",
         storageBucket: "trx-earn-bott.appspot.com",
         messagingSenderId: "682053542270",
-        appId: "1:682053542270:web:780046a72f2142635d132f",
+        appId: "1:682053542270:web:780046a72f2142635d132f"
     };
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const userId = tg.initDataUnsafe?.user?.id.toString() || 'test_user_123'; // Fallback for testing
+    let userData = {};
 
-    // --- Page Navigation ---
+    // --- UI Element References ---
     const pages = document.querySelectorAll('.page');
-    const navButtons = document.querySelectorAll('.nav-btn');
-    
-    function showPage(pageId) {
-        pages.forEach(page => page.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-        navButtons.forEach(button => {
-            button.classList.remove('active');
-            if (button.dataset.page === pageId) button.classList.add('active');
-        });
-    }
-
-    navButtons.forEach(button => {
-        button.addEventListener('click', () => showPage(button.dataset.page));
-    });
-
-    // --- DOM Elements ---
+    const navBtns = document.querySelectorAll('.nav-btn');
     const trxBalance = document.getElementById('trx-balance');
     const walletInput = document.getElementById('wallet-input');
     const setWalletBtn = document.getElementById('set-wallet-btn');
+    const withdrawalAmountInput = document.getElementById('withdrawal-amount');
     const withdrawBtn = document.getElementById('withdraw-btn');
     const watchAdBtn = document.getElementById('watch-ad-btn');
     const adCooldownTimer = document.getElementById('ad-cooldown-timer');
-    const taskList = document.getElementById('task-list');
     const referralLinkInput = document.getElementById('referral-link');
     const copyLinkBtn = document.getElementById('copy-link-btn');
     const verifiedReferrals = document.getElementById('verified-referrals');
-    const referralEarnings = document.getElementById('referral-earnings');
+    const taskList = document.getElementById('task-list');
 
-    // --- App State ---
-    let currentUser = tg.initDataUnsafe?.user;
-    let userData = {};
-
-    if (!currentUser) {
-        document.body.innerHTML = "<h1 style='text-align: center; margin-top: 50px;'>Please open this app through Telegram.</h1>";
-        return;
+    // --- Page Navigation ---
+    function showPage(pageId) {
+        pages.forEach(page => page.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
     }
-    const userId = currentUser.id.toString();
+
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const pageId = btn.dataset.page;
+            showPage(pageId);
+            navBtns.forEach(navBtn => navBtn.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
 
     // --- Core Functions ---
     async function initializeUser() {
-        const userRef = doc(db, 'users', userId);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-            userData = userSnap.data();
-        } else {
-            const referredBy = tg.initDataUnsafe?.start_param || null;
-            userData = {
-                balance: 0,
-                walletAddress: '',
-                adViews: 0,
-                tasksCompleted: [],
-                referrals: [],
-                referredBy: referredBy,
-                lastAdView: 0,
-                referralBonusPaid: false
-            };
-            await setDoc(userRef, userData);
+        try {
+            const userRef = doc(db, 'users', userId);
+            const userSnap = await getDoc(userRef);
+
+            if (userSnap.exists()) {
+                userData = userSnap.data();
+            } else {
+                userData = {
+                    userId: userId,
+                    balance: 0,
+                    walletAddress: '',
+                    adViews: 0,
+                    tasksCompleted: [],
+                    referrals: [],
+                    referredBy: tg.initDataUnsafe?.start_param || null,
+                    lastAdView: 0,
+                    referralBonusPaid: false
+                };
+                await setDoc(userRef, userData);
+            }
+            if (!Array.isArray(userData.tasksCompleted)) userData.tasksCompleted = [];
+            updateUI();
+            loadTasks();
+        } catch (error) {
+            console.error("Error initializing user:", error);
+            alert("Error: Could not load your data. Please try restarting the app.");
         }
-        updateUI();
-        loadTasks();
     }
 
     function updateUI() {
@@ -86,54 +86,58 @@ document.addEventListener('DOMContentLoaded', async () => {
         walletInput.value = userData.walletAddress || '';
         referralLinkInput.value = `https://t.me/TrxEarnBot_bot?start=${userId}`;
         verifiedReferrals.textContent = (userData.referrals || []).length;
-        // referralEarnings would need to be calculated and stored separately
     }
 
     async function loadTasks() {
-        const tasksCol = collection(db, 'tasks');
-        const taskSnapshot = await getDocs(tasksCol);
-        taskList.innerHTML = '';
-        taskSnapshot.forEach(doc => {
-            const task = doc.data();
-            if (!userData.tasksCompleted.includes(doc.id)) {
-                const taskElement = document.createElement('div');
-                taskElement.className = 'task-card';
-                taskElement.innerHTML = `
-                    <div>
-                        <h2>${task.name}</h2>
+        try {
+            const tasksCol = collection(db, 'tasks');
+            const taskSnapshot = await getDocs(tasksCol);
+            taskList.innerHTML = '';
+            taskSnapshot.forEach(doc => {
+                const task = doc.data();
+                if (!userData.tasksCompleted.includes(doc.id)) {
+                    const taskElement = document.createElement('div');
+                    taskElement.className = 'task-card';
+                    taskElement.innerHTML = `
+                        <h3>${task.title}</h3>
                         <p>${task.description}</p>
-                    </div>
-                    <button class="claim-task-btn" data-task-id="${doc.id}" data-reward="${task.reward}" data-url="${task.url}">Claim ${task.reward} TRX</button>
-                `;
-                taskList.appendChild(taskElement);
-            }
-        });
+                        <p>Reward: ${task.reward} TRX</p>
+                        <button class="claim-task-btn" data-id="${doc.id}" data-reward="${task.reward}" data-link="${task.link}">Claim Reward</button>
+                    `;
+                    taskList.appendChild(taskElement);
+                }
+            });
+        } catch (error) {
+            console.error("Error loading tasks:", error);
+        }
     }
 
     // --- Event Listeners ---
     setWalletBtn.addEventListener('click', async () => {
         const newAddress = walletInput.value.trim();
-        // Basic validation for a TRX address (starts with 'T', 34 chars)
-        if (newAddress.startsWith('T') && newAddress.length === 34) {
+        if (!newAddress.startsWith('T') || newAddress.length !== 34) {
+            alert('Invalid TRX wallet address.');
+            return;
+        }
+        try {
             await updateDoc(doc(db, 'users', userId), { walletAddress: newAddress });
             userData.walletAddress = newAddress;
-            updateUI(); // Refresh the UI to show the new address
+            updateUI();
             alert('Wallet address updated!');
-        } else {
-            alert('Invalid TRX wallet address. It must start with T and be 34 characters long.');
+        } catch (error) {
+            console.error("Error setting wallet address:", error);
+            alert('Error: Could not save wallet address.');
         }
     });
 
     withdrawBtn.addEventListener('click', async () => {
-        const withdrawalAmountInput = document.getElementById('withdrawal-amount');
         const amount = parseFloat(withdrawalAmountInput.value);
-
         if (isNaN(amount) || amount <= 0) {
-            alert('Please enter a valid amount to withdraw.');
+            alert('Please enter a valid amount.');
             return;
         }
         if (amount < 3.5) {
-            alert('Minimum withdrawal amount is 3.5 TRX.');
+            alert('Minimum withdrawal is 3.5 TRX.');
             return;
         }
         if (amount > userData.balance) {
@@ -144,88 +148,109 @@ document.addEventListener('DOMContentLoaded', async () => {
             alert('Please set your wallet address first.');
             return;
         }
+        try {
+            const batch = writeBatch(db);
+            const userRef = doc(db, 'users', userId);
+            const withdrawalRef = doc(collection(db, 'withdrawals'));
 
-        // All checks passed, proceed with withdrawal request
-        await addDoc(collection(db, 'withdrawals'), {
-            userId: userId,
-            amount: amount,
-            walletAddress: userData.walletAddress,
-            status: 'pending',
-            timestamp: serverTimestamp()
-        });
+            batch.set(withdrawalRef, {
+                userId: userId,
+                amount: amount,
+                walletAddress: userData.walletAddress,
+                status: 'pending',
+                timestamp: serverTimestamp()
+            });
 
-        userData.balance -= amount;
-        await updateDoc(doc(db, 'users', userId), { balance: userData.balance });
-        
-        updateUI();
-        withdrawalAmountInput.value = ''; // Clear the input field
-        alert('Withdrawal request submitted!');
+            userData.balance -= amount;
+            batch.update(userRef, { balance: userData.balance });
+
+            await batch.commit();
+            updateUI();
+            withdrawalAmountInput.value = '';
+            alert('Withdrawal request submitted!');
+        } catch (error) {
+            console.error("Error submitting withdrawal:", error);
+            alert('Error: Could not submit withdrawal request.');
+        }
     });
 
     watchAdBtn.addEventListener('click', () => {
         const now = Date.now();
         const cooldown = 15 * 1000;
         if (now - (userData.lastAdView || 0) < cooldown) {
-            alert('Please wait for the cooldown.');
+            alert('Please wait for the cooldown to finish.');
             return;
         }
 
         if (typeof show_9682261 === 'function') {
             show_9682261().then(async () => {
-                const batch = writeBatch(db);
-                const userRef = doc(db, 'users', userId);
+                try {
+                    const adReward = 0.005;
+                    const batch = writeBatch(db);
+                    const userRef = doc(db, 'users', userId);
 
-                // 1. Reward user
-                userData.balance += 0.005;
-                userData.adViews += 1;
-                userData.lastAdView = now;
-                batch.update(userRef, {
-                    balance: userData.balance,
-                    adViews: userData.adViews,
-                    lastAdView: userData.lastAdView
-                });
+                    userData.adViews = (userData.adViews || 0) + 1;
+                    userData.lastAdView = now;
+                    userData.balance = (userData.balance || 0) + adReward;
 
-                // 2. Check for referral verification
-                if (userData.adViews === 5 && userData.referredBy && !userData.referralBonusPaid) {
-                    const referrerRef = doc(db, 'users', userData.referredBy);
-                    const referrerSnap = await getDoc(referrerRef);
-                    if (referrerSnap.exists()) {
-                        const referrerData = referrerSnap.data();
-                        batch.update(referrerRef, { balance: (referrerData.balance || 0) + 0.05 });
-                        batch.update(userRef, { referralBonusPaid: true });
-                        userData.referralBonusPaid = true;
+                    batch.update(userRef, {
+                        balance: userData.balance,
+                        adViews: userData.adViews,
+                        lastAdView: userData.lastAdView
+                    });
+
+                    if (userData.adViews === 5 && userData.referredBy && !userData.referralBonusPaid) {
+                        const referrerRef = doc(db, 'users', userData.referredBy);
+                        const referrerSnap = await getDoc(referrerRef);
+                        if (referrerSnap.exists()) {
+                            const referralBonus = 0.05;
+                            batch.update(referrerRef, { 
+                                balance: (referrerSnap.data().balance || 0) + referralBonus,
+                                referrals: [...(referrerSnap.data().referrals || []), userId]
+                            });
+                            batch.update(userRef, { referralBonusPaid: true });
+                            userData.referralBonusPaid = true;
+                        }
                     }
+
+                    await batch.commit();
+                    updateUI();
+                    alert('You have been rewarded 0.005 TRX!');
+                    startAdCooldown();
+                } catch (error) {
+                    console.error("Error processing ad reward:", error);
+                    alert('Error: Could not process reward.');
                 }
-                await batch.commit();
-                updateUI();
-                alert('You earned 0.005 TRX!');
-                startAdCooldown();
             });
         } else {
-             alert('Ad SDK not available.');
+            alert('Ad SDK not available.');
         }
     });
 
     taskList.addEventListener('click', async (e) => {
         if (e.target.classList.contains('claim-task-btn')) {
-            const button = e.target;
-            const taskId = button.dataset.taskId;
-            const reward = parseFloat(button.dataset.reward);
-            const url = button.dataset.url;
+            const taskId = e.target.dataset.id;
+            const reward = parseFloat(e.target.dataset.reward);
+            const link = e.target.dataset.link;
 
-            window.open(url, '_blank');
-            
-            // Note: No real way to verify task completion automatically.
-            // We'll trust the user for now.
-            userData.balance += reward;
-            userData.tasksCompleted.push(taskId);
-            await updateDoc(doc(db, 'users', userId), {
-                balance: userData.balance,
-                tasksCompleted: userData.tasksCompleted
-            });
-            updateUI();
-            button.closest('.task-card').remove();
-            alert(`Task complete! You earned ${reward} TRX.`);
+            window.open(link, '_blank');
+
+            try {
+                userData.balance += reward;
+                userData.tasksCompleted.push(taskId);
+
+                await updateDoc(doc(db, 'users', userId), {
+                    balance: userData.balance,
+                    tasksCompleted: userData.tasksCompleted
+                });
+
+                updateUI();
+                e.target.closest('.task-card').remove();
+                alert(`Task complete! You earned ${reward} TRX.`);
+            } catch (error) {
+                console.error("Error claiming task:", error);
+                alert('Error: Could not claim task reward.');
+            }
         }
     });
 
@@ -236,15 +261,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     function startAdCooldown() {
-        let cooldown = 15;
+        let timeLeft = 15;
         watchAdBtn.disabled = true;
-        adCooldownTimer.textContent = `Next ad in ${cooldown}s`;
+        adCooldownTimer.style.display = 'inline';
+        adCooldownTimer.textContent = `(${timeLeft}s)`;
+
         const interval = setInterval(() => {
-            cooldown--;
-            adCooldownTimer.textContent = `Next ad in ${cooldown}s`;
-            if (cooldown <= 0) {
+            timeLeft--;
+            adCooldownTimer.textContent = `(${timeLeft}s)`;
+            if (timeLeft <= 0) {
                 clearInterval(interval);
-                adCooldownTimer.textContent = '';
+                adCooldownTimer.style.display = 'none';
                 watchAdBtn.disabled = false;
             }
         }, 1000);
@@ -253,4 +280,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Initial Load ---
     await initializeUser();
     showPage('wallet-section');
+    navBtns[0].classList.add('active');
 });
